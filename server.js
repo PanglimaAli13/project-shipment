@@ -5,7 +5,11 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: 'https://shipment-form-abcd.vercel.app', // GANTI DENGAN URL VERCEL ANDA YANG ASLI
+    methods: ['GET', 'POST'],
+    credentials: true
+}));
 app.use(bodyParser.json());
 
 // =========================================================
