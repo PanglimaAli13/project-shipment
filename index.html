@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Form Input Shipment (Optimized)</title>
+    <title>Form Input Shipment</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles untuk tampilan Soft UI */
@@ -105,8 +105,9 @@
     </div>
 
     <script>
-        const API_URL = 'https://project-shipment.vercel.app/api'; 
-
+        // GANTI 'project-shipment.vercel.app' DENGAN URL VERCEL PROYEK ANDA YANG ASLI
+        const API_URL_BASE = 'https://project-shipment.vercel.app'; 
+        
         // Fungsi utilitas untuk membuka dan menutup modal
         function openModal(modalId) {
             document.getElementById(modalId).classList.remove('hidden');
@@ -116,11 +117,41 @@
             document.getElementById(modalId).classList.add('hidden');
         }
 
+        // ==========================================================
+        // !!! FUNGSI UNTUK PENGHITUNGAN SHIPMENT !!!
+        // ==========================================================
+        
+        function getShipmentCount() {
+            const shipmentInputs = document.querySelectorAll('[id^="shipment_"]');
+            let count = 0;
+            shipmentInputs.forEach(input => {
+                const value = input.value.trim();
+                if (value.length === 10) {
+                    count++;
+                }
+            });
+            return count;
+        }
+
+        function updateShipmentCount() {
+            const count = getShipmentCount();
+            document.getElementById('shipmentCount').textContent = count;
+            document.getElementById('shipmentSummary').classList.remove('hidden');
+        }
+        
         // 1. Load Drivers saat halaman dibuka
         window.addEventListener('DOMContentLoaded', async () => {
             try {
-                const res = await fetch(`${API_URL}/drivers`);
+                // API dipanggil ke /api/drivers (yang ditangani oleh Serverless Function)
+                const res = await fetch(`${API_URL_BASE}/api/drivers`);
                 const drivers = await res.json();
+
+                if (res.status !== 200) {
+                     // Menangani error jika serverless function bermasalah
+                     alert('Gagal memuat data driver. Cek Variable Lingkungan DATABASE_URL di Vercel.');
+                     return;
+                }
+
                 const select = document.getElementById('driverSelect');
                 drivers.forEach(d => {
                     const opt = document.createElement('option');
@@ -131,39 +162,10 @@
                 });
             } catch (e) { 
                 console.error(e);
-                alert('Gagal memuat data driver. Pastikan server.js berjalan.');
+                alert('Terjadi kesalahan koneksi ke API. Pastikan Serverless Functions sudah di-deploy.');
             }
         });
 
-        // ==========================================================
-        // !!! FUNGSI BARU UNTUK PENGHITUNGAN SHIPMENT !!!
-        // ==========================================================
-        
-        // Fungsi untuk mengambil hitungan dari semua input di tabel
-        function getShipmentCount() {
-            // Ambil semua elemen input yang memiliki ID dimulai dengan 'shipment_'
-            const shipmentInputs = document.querySelectorAll('[id^="shipment_"]');
-            
-            let count = 0;
-            shipmentInputs.forEach(input => {
-                const value = input.value.trim();
-                // Hitung jika value-nya tidak kosong dan memiliki panjang 10 digit (valid)
-                if (value.length === 10) {
-                    count++;
-                }
-            });
-            return count;
-        }
-
-        // Fungsi untuk memperbarui tampilan hitungan
-        function updateShipmentCount() {
-            const count = getShipmentCount();
-            document.getElementById('shipmentCount').textContent = count;
-            // Tampilkan summary
-            document.getElementById('shipmentSummary').classList.remove('hidden');
-        }
-
-        // ==========================================================
         // 2. Fungsi Utama: Load Data & Generate Table (Optimized)
         async function loadData() {
             const select = document.getElementById('driverSelect');
@@ -180,16 +182,18 @@
             // Ambil data existing dari DB
             let existingData = [];
             try {
-                const res = await fetch(`${API_URL}/shipments?nik=${nik}&startDate=${start}&endDate=${end}`);
+                // API dipanggil ke /api/shipments (GET)
+                const res = await fetch(`${API_URL_BASE}/api/shipments?nik=${nik}&startDate=${start}&endDate=${end}`);
                 existingData = await res.json();
             } catch (e) {
                 console.error(e);
-                alert('Gagal mengambil data shipment dari server.');
+                alert('Gagal mengambil data shipment dari API.');
                 return;
             }
 
             let tableHTML = '';
             
+            // Perbaikan Logika Tanggal (Zona Waktu Lokal)
             let currDate = new Date(start + 'T00:00:00');
             const lastDate = new Date(end + 'T00:00:00');
 
@@ -198,7 +202,7 @@
                 const dateStrDisplay = currDate.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 const isSunday = currDate.getDay() === 0;
 
-                const foundData = existingData.find(d => d.tanggal.startsWith(dateStrISO));
+                const foundData = existingData.find(d => d.tanggal && d.tanggal.startsWith(dateStrISO));
                 const shipmentValue = (foundData && foundData.shipment_code !== '-') ? foundData.shipment_code : '';
                 const placeholder = shipmentValue ? shipmentValue : '-';
 
@@ -232,12 +236,11 @@
                 currDate.setDate(currDate.getDate() + 1);
             }
 
-            // OPTIMASI: Hanya sekali manipulasi DOM
             const tbody = document.getElementById('shipmentTableBody');
             tbody.innerHTML = tableHTML;
             document.getElementById('tableContainer').classList.remove('hidden');
 
-            // !!! Panggil fungsi penghitungan setelah tabel dimuat !!!
+            // Panggil fungsi penghitungan setelah tabel dimuat
             updateShipmentCount();
         }
 
@@ -249,18 +252,18 @@
             const shipmentInput = document.getElementById(`shipment_${dateISO}`);
             const shipment_code = shipmentInput.value.trim();
 
-            // VALIDASI: Hanya boleh 10 digit, atau kosong
+            // VALIDASI
             if (shipment_code.length > 0 && shipment_code.length !== 10) {
                 openModal('errorModal');
                 shipmentInput.focus();
                 return;
             }
 
-            // Jika input kosong, kita kirimkan '-' ke database
             const final_shipment_code = shipment_code === '' ? '-' : shipment_code;
 
             try {
-                const res = await fetch(`${API_URL}/shipments`, {
+                // API dipanggil ke /api/shipments (POST)
+                const res = await fetch(`${API_URL_BASE}/api/shipments`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -279,11 +282,10 @@
                     
                     openModal('successModal');
                     
-                    // Feedback visual di input
                     shipmentInput.classList.add('border-green-500', 'ring-2', 'ring-green-200');
                     setTimeout(() => shipmentInput.classList.remove('border-green-500', 'ring-2', 'ring-green-200'), 1500);
 
-                    // !!! Panggil fungsi penghitungan ulang setelah berhasil menyimpan !!!
+                    // Panggil fungsi penghitungan ulang
                     updateShipmentCount();
 
                 } else {
@@ -291,7 +293,7 @@
                 }
             } catch (e) {
                 console.error('Terjadi kesalahan koneksi:', e);
-                alert('Terjadi kesalahan koneksi ke server.');
+                alert('Terjadi kesalahan koneksi ke API.');
             }
         }
     </script>
