@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Shipment Input App using Vercel, Neon, and Serverless Functions.",
   "main": "index.html",
+  "type": "module",
   "scripts": {
     "start": "echo 'This project runs via Vercel Serverless Functions and Static HTML.'"
   },
