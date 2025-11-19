@@ -11,8 +11,9 @@ app.use(bodyParser.json());
 // =========================================================
 // !!! GANTI DENGAN CONNECTION STRING NEON.TECH ANDA !!!
 // =========================================================
+require('dotenv').config();
 const pool = new Pool({
-  connectionString: 'postgresql://neondb_owner:npg_8YkEJgzWA7Pl@ep-misty-base-af7tukx4-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+  connectionString: process.env.DATABASE_URL,
 });
 
 // Ambil Data Driver untuk Dropdown
